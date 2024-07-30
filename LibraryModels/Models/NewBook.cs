@@ -8,7 +8,7 @@ namespace LibraryModels.Models
         public required List<Author> NewAuthors { get; set; } = new List<Author>(); 
         public Book Book { get; set; } = new Book();
         public List<int>? ExistingAuthorsIds { get; set; } = new List<int>();
-        public IFormFile pictureFile { get; set; }  
+        public IFormFile? BookPicture { get; set; } 
 
     }
 }
