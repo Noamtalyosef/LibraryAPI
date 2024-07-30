@@ -38,13 +38,27 @@ namespace LibraryAPI.Reposetories
                 existingAuthorsIds.Rows.Add(id);
             }
 
+            var pictureFilePath = Path.Combine("wwwroot/photos/", bookDto.BookPicture!.FileName);
+
+            using (var stream = new FileStream(pictureFilePath, FileMode.Create))
+            {
+                await bookDto.BookPicture!.CopyToAsync(stream);
+            }
+
+
+            var copyFilePath = Path.Combine("wwwroot/copys/", bookDto.BookCopy!.FileName);
+
+            using (var stream = new FileStream(pictureFilePath, FileMode.Create))
+            {
+                await bookDto.BookCopy!.CopyToAsync(stream);
+            }
 
             await connection.ExecuteAsync("Stp_Library_CreateBook", new
             {
                 Name = bookDto.Book.Name,
                 YearOfPublish = bookDto.Book.YearOfPublish,
-                PicturePath = bookDto.Book.PicturePath,
-                CopyPath = bookDto.Book.CopyPath,
+                PicturePath = bookDto.BookPicture.FileName,
+                CopyPath = bookDto.BookCopy.FileName,
                 PublisherId = bookDto.Book.Publisher.Id,
                 ExistingAuthorsIds = existingAuthorsIds,
                 NewAuthors = newAuthors

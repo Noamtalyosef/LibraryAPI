@@ -4,6 +4,7 @@ using LibraryModels.Models;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 
 namespace LibraryAPI.Controllers
 {
@@ -81,11 +82,23 @@ namespace LibraryAPI.Controllers
 
         [HttpPost]
         [Route("CreateBook")]
-        public async Task<IActionResult> Create(NewBook newBookDto)
+        public async Task<IActionResult> Create([FromForm] List<IFormFile> bookFiles, [FromForm] string book, [FromForm] string existingAuthorsIds, [FromForm] string newAuthors)
         {
             try
             {
-                await _bookReposetory.CreateAsync(newBookDto);
+
+                var fileExtention = Path.GetExtension(bookFiles[0].FileName).ToLower();
+                if (fileExtention != ".jpeg" && fileExtention != ".png")
+                {
+                    return BadRequest();
+                }
+
+                var bookObject = JsonConvert.DeserializeObject<Book>(book);
+                var existingAuthorsIdsList = JsonConvert.DeserializeObject<List<int>>(existingAuthorsIds);
+                var newAuthorsList = JsonConvert.DeserializeObject<List<Author>>(newAuthors);
+
+                var newBook = new NewBook { Book = bookObject, BookPicture = bookFiles[0], ExistingAuthorsIds = existingAuthorsIdsList, NewAuthors = newAuthorsList, BookCopy = bookFiles[1] };
+                await _bookReposetory.CreateAsync(newBook);
                 return Ok();
             }
             catch (Exception ex)
