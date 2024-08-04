@@ -40,15 +40,12 @@ namespace LibraryAPI.Reposetories
                 existingAuthorsIds.Rows.Add(id);
             }
 
-            var uniquePicturePath = await _bookFilesHelper.CreatePhoto(bookDto.BookPicture);
-            var uniqueCopyPath = await _bookFilesHelper.CreateCopy(bookDto.BookCopy);
-
             await connection.ExecuteAsync("Stp_Library_CreateBook", new 
             {
                 Name = bookDto.Book.Name,
                 YearOfPublish = bookDto.Book.YearOfPublish,
-                PicturePath = uniquePicturePath,
-                CopyPath = uniqueCopyPath,
+                PicturePath = bookDto.Book.PicturePath,
+                CopyPath = bookDto.Book.CopyPath,
                 PublisherId = bookDto.Book.Publisher.Id,
                 ExistingAuthorsIds = existingAuthorsIds,
                 NewAuthors = newAuthors
@@ -64,6 +61,7 @@ namespace LibraryAPI.Reposetories
             var numOfChanges =  await connection.ExecuteAsync("Stp_Library_DeleteBook", new {BookId = Book.Id });
             return numOfChanges > 0;    
         }
+      
 
         public async Task<List<Book>> GetAllAsync()
         {
@@ -126,26 +124,8 @@ namespace LibraryAPI.Reposetories
             throw new NotImplementedException();
         }
 
-        public async Task UpdateAsync(Book book, List<IFormFile> bookFiles)
+        public async Task UpdateAsync(Book book)
         {
-            var copy = bookFiles[0];
-            var photo = bookFiles[1];
-
-            _bookFilesHelper.DeleteCopy(book.CopyPath);
-            _bookFilesHelper.DeletePhoto(book.PicturePath);
-
-            var uniqCopyPath = await _bookFilesHelper.CreateCopy(copy);
-            var uniqPhotoPath =  await _bookFilesHelper.CreatePhoto(photo);
-
-            book.PicturePath = uniqPhotoPath;
-            book.CopyPath = uniqCopyPath;
-
-            await BaseUpdate(book);
-        }
-
-        public async Task BaseUpdate(Book book)
-        {
-
             using var connection = new SqlConnection(_libraryConnectionString);
             var authorsIds = new DataTable();
             authorsIds.Columns.Add("id", typeof(int));
@@ -163,13 +143,6 @@ namespace LibraryAPI.Reposetories
                 PublisherId = book.Publisher.Id,
                 authorsIds = authorsIds
             });
-        }
-
-        public async Task DeletePhoto(Book book)
-        {
-            _bookFilesHelper.DeletePhoto(book.PicturePath);
-            book.PicturePath = "---.png";
-            await BaseUpdate(book); 
         }
     }
 }

@@ -5,8 +5,14 @@ namespace LibraryAPI.Helpers
     public class BookFilesHelper : IBookFilesHelper
     {
 
-        private const string _photosUrl = "wwwroot/photos/";
-        private const string _copysUrl = "wwwroot/copys/";
+        private string _photosUrl;
+        private string _copysUrl;
+
+        public BookFilesHelper(IStartupConfig startupConfig)
+        {
+            _photosUrl = startupConfig.PhotosPath;
+            _copysUrl = startupConfig.CopysPath;    
+        }
         public async Task<string> CreateCopy(IFormFile copyFile)
         {
             var uniqueCopyPath = $"{Path.GetFileNameWithoutExtension(copyFile.FileName)}_{Guid.NewGuid()}{Path.GetExtension(copyFile.FileName)}";

@@ -18,11 +18,13 @@ namespace LibraryAPI.Controllers
     {
         private readonly IBookReposetory _bookReposetory;
         private readonly IBookFilesHelper _bookFilesHelper;
+        private readonly string _defaultImagePath;
         private HttpClient _httpClient;
-        public BookController(IBookReposetory bookReposetory,IHttpClientFactory httpClientFactory, IBookFilesHelper bookFilesHelper)
+        public BookController(IBookReposetory bookReposetory,IHttpClientFactory httpClientFactory, IBookFilesHelper bookFilesHelper, IStartupConfig startupConfig)
         {
             _bookReposetory = bookReposetory;
             _bookFilesHelper = bookFilesHelper;
+            _defaultImagePath = startupConfig.DefaultImagePath;
             _httpClient = httpClientFactory.CreateClient();
         }
 
@@ -105,7 +107,14 @@ namespace LibraryAPI.Controllers
                 var bookObject = JsonConvert.DeserializeObject<Book>(book);
                 var existingAuthorsIdsList = JsonConvert.DeserializeObject<List<int>>(existingAuthorsIds);
                 var newAuthorsList = JsonConvert.DeserializeObject<List<Author>>(newAuthors);
-                var newBook = new NewBook { Book = bookObject, BookPicture = bookFiles[0], ExistingAuthorsIds = existingAuthorsIdsList, NewAuthors = newAuthorsList, BookCopy = bookFiles[1] };
+
+                var uniqePicturePath = await _bookFilesHelper.CreatePhoto(bookFiles[0]);
+                var uniqeCopyPath = await _bookFilesHelper.CreateCopy(bookFiles[1]);
+
+                bookObject.PicturePath = uniqePicturePath;
+                bookObject.CopyPath = uniqeCopyPath;
+
+                var newBook = new NewBook { Book = bookObject,  ExistingAuthorsIds = existingAuthorsIdsList, NewAuthors = newAuthorsList };
                 await _bookReposetory.CreateAsync(newBook);
                 return Ok();
             }
@@ -123,7 +132,10 @@ namespace LibraryAPI.Controllers
             {
                 var bookObject = JsonConvert.DeserializeObject<Book>(book);
 
-                await _bookReposetory.UpdateAsync(bookObject!,bookFiles);
+                bookObject!.PicturePath = await _bookFilesHelper.CreatePhoto(bookFiles[1]);
+                bookObject!.CopyPath = await _bookFilesHelper.CreateCopy(bookFiles[0]);
+
+                await _bookReposetory.UpdateAsync(bookObject!);
                 return Ok();
             }
             catch (Exception ex)
@@ -138,7 +150,9 @@ namespace LibraryAPI.Controllers
         {
             try
             {
-                await _bookReposetory.DeletePhoto(book);
+                _bookFilesHelper.DeletePhoto(book.PicturePath);
+                book.PicturePath = _defaultImagePath;
+                await _bookReposetory.UpdateAsync(book);
                 return Ok();    
             }
             catch(Exception ex) 
