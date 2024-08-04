@@ -1,4 +1,5 @@
 
+using LibraryAPI.Helpers;
 using LibraryAPI.Interfaces;
 using LibraryAPI.Reposetories;
 
@@ -15,7 +16,10 @@ namespace LibraryAPI
             builder.Services.AddControllers();
             builder.Services.AddSingleton<IAuthorReposetory, AuthorReposetory>();
             builder.Services.AddSingleton<IBookReposetory, BookReposetory>();
-            builder.Services.AddSingleton<IStartupConfig, StartupConfig>(); 
+            builder.Services.AddSingleton<IStartupConfig, StartupConfig>();
+            builder.Services.AddSingleton<IBookFilesHelper, BookFilesHelper>();
+            builder.Services.AddHttpClient();
+
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();

@@ -10,9 +10,11 @@ namespace LibraryAPI.Reposetories
     public class BookReposetory : IBookReposetory
     {
         private readonly string _libraryConnectionString;
-        public BookReposetory(IStartupConfig startupConfig)
+        private IBookFilesHelper _bookFilesHelper;
+        public BookReposetory(IStartupConfig startupConfig , IBookFilesHelper bookFilesHelper)
         {
             _libraryConnectionString = startupConfig.ConnectionString;
+            _bookFilesHelper = bookFilesHelper; 
         }
 
         public async Task CreateAsync(NewBook bookDto)
@@ -28,7 +30,7 @@ namespace LibraryAPI.Reposetories
 
             foreach (var author in bookDto.NewAuthors)
             {
-                newAuthors.Rows.Add(author.FirstName, author.LastName, author.City.Id, author.YearOfBirth);
+               newAuthors.Rows.Add(author.FirstName, author.LastName, author.City.Id, author.YearOfBirth);
             }
 
             existingAuthorsIds.Columns.Add("Id", typeof(int));
@@ -38,37 +40,28 @@ namespace LibraryAPI.Reposetories
                 existingAuthorsIds.Rows.Add(id);
             }
 
-            var pictureFilePath = Path.Combine("wwwroot/photos/", bookDto.BookPicture!.FileName);
+            var uniquePicturePath = await _bookFilesHelper.CreatePhoto(bookDto.BookPicture);
+            var uniqueCopyPath = await _bookFilesHelper.CreateCopy(bookDto.BookCopy);
 
-            using (var stream = new FileStream(pictureFilePath, FileMode.Create))
-            {
-                await bookDto.BookPicture!.CopyToAsync(stream);
-            }
-
-
-            var copyFilePath = Path.Combine("wwwroot/copys/", bookDto.BookCopy!.FileName);
-
-            using (var stream = new FileStream(pictureFilePath, FileMode.Create))
-            {
-                await bookDto.BookCopy!.CopyToAsync(stream);
-            }
-
-            await connection.ExecuteAsync("Stp_Library_CreateBook", new
+            await connection.ExecuteAsync("Stp_Library_CreateBook", new 
             {
                 Name = bookDto.Book.Name,
                 YearOfPublish = bookDto.Book.YearOfPublish,
-                PicturePath = bookDto.BookPicture.FileName,
-                CopyPath = bookDto.BookCopy.FileName,
+                PicturePath = uniquePicturePath,
+                CopyPath = uniqueCopyPath,
                 PublisherId = bookDto.Book.Publisher.Id,
                 ExistingAuthorsIds = existingAuthorsIds,
                 NewAuthors = newAuthors
             });
         }
 
-        public async Task<bool> DeleteAsync(int BookId)
+        public async Task<bool> DeleteAsync(Book Book)
         {
+            _bookFilesHelper.DeleteCopy(Book.CopyPath);
+            _bookFilesHelper.DeletePhoto(Book.PicturePath);
+
             using var connection = new SqlConnection(_libraryConnectionString);
-            var numOfChanges =  await connection.ExecuteAsync("Stp_Library_DeleteBook", new { BookId });
+            var numOfChanges =  await connection.ExecuteAsync("Stp_Library_DeleteBook", new {BookId = Book.Id });
             return numOfChanges > 0;    
         }
 
@@ -133,25 +126,50 @@ namespace LibraryAPI.Reposetories
             throw new NotImplementedException();
         }
 
-        public async Task UpdateAsync(Book book)
+        public async Task UpdateAsync(Book book, List<IFormFile> bookFiles)
         {
+            var copy = bookFiles[0];
+            var photo = bookFiles[1];
+
+            _bookFilesHelper.DeleteCopy(book.CopyPath);
+            _bookFilesHelper.DeletePhoto(book.PicturePath);
+
+            var uniqCopyPath = await _bookFilesHelper.CreateCopy(copy);
+            var uniqPhotoPath =  await _bookFilesHelper.CreatePhoto(photo);
+
+            book.PicturePath = uniqPhotoPath;
+            book.CopyPath = uniqCopyPath;
+
+            await BaseUpdate(book);
+        }
+
+        public async Task BaseUpdate(Book book)
+        {
+
             using var connection = new SqlConnection(_libraryConnectionString);
             var authorsIds = new DataTable();
-            authorsIds.Columns.Add("id",typeof(int));
-            foreach(var author in book.Authors)
+            authorsIds.Columns.Add("id", typeof(int));
+            foreach (var author in book.Authors)
             {
-                authorsIds.Rows.Add(author.Id); 
+                authorsIds.Rows.Add(author.Id);
             }
             await connection.ExecuteAsync("Stp_Library_UpdateBook", new
             {
                 Id = book.Id,
                 Name = book.Name,
-                YearOfPublish = book.YearOfPublish, 
+                YearOfPublish = book.YearOfPublish,
                 PicturePath = book.PicturePath,
                 CopyPath = book.CopyPath,
                 PublisherId = book.Publisher.Id,
                 authorsIds = authorsIds
             });
+        }
+
+        public async Task DeletePhoto(Book book)
+        {
+            _bookFilesHelper.DeletePhoto(book.PicturePath);
+            book.PicturePath = "---.png";
+            await BaseUpdate(book); 
         }
     }
 }

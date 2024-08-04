@@ -3,6 +3,8 @@ using LibraryAPI.Reposetories;
 using LibraryModels.Models;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using System.Net.Http;
+using System.Text;
 
 namespace LibraryAPI.Controllers
 {
@@ -12,9 +14,11 @@ namespace LibraryAPI.Controllers
     public class AuthorController : Controller
     {
         private readonly IAuthorReposetory _authorReposetory;
-        public AuthorController(IAuthorReposetory authorReposetory)
+        private HttpClient _httpClient;
+        public AuthorController(IAuthorReposetory authorReposetory, IHttpClientFactory httpClientFactory)
         {
             _authorReposetory = authorReposetory;
+            _httpClient = httpClientFactory.CreateClient();
         }
 
         [HttpGet]
@@ -48,7 +52,7 @@ namespace LibraryAPI.Controllers
         }
 
         [HttpGet]
-        [Route("GetCitys")]
+        [Route("GetCitys")] 
         public async Task <IActionResult> GetCitys()
         {
             try
@@ -67,7 +71,10 @@ namespace LibraryAPI.Controllers
         {
             try
             {
-                return Ok(await _authorReposetory.DeleteAsync(id));
+                var isDeleted = await _authorReposetory.DeleteAsync(id);
+                using StringContent idAsJson = new(id.ToString(), Encoding.UTF8, "application/json");
+                var res = await _httpClient.PostAsync($"http://localhost:5158/api/LibrarySignalR/AuthorDeleted", idAsJson);
+                return Ok(isDeleted);
             }
             catch (Exception ex)
             {

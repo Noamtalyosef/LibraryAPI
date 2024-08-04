@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using System.Diagnostics.Eventing.Reader;
+using System.Net.Http;
+using System.Text;
 
 namespace LibraryAPI.Controllers
 {
@@ -14,9 +17,13 @@ namespace LibraryAPI.Controllers
     public class BookController : ControllerBase
     {
         private readonly IBookReposetory _bookReposetory;
-        public BookController(IBookReposetory bookReposetory)
+        private readonly IBookFilesHelper _bookFilesHelper;
+        private HttpClient _httpClient;
+        public BookController(IBookReposetory bookReposetory,IHttpClientFactory httpClientFactory, IBookFilesHelper bookFilesHelper)
         {
             _bookReposetory = bookReposetory;
+            _bookFilesHelper = bookFilesHelper;
+            _httpClient = httpClientFactory.CreateClient();
         }
 
         [HttpGet]
@@ -64,13 +71,15 @@ namespace LibraryAPI.Controllers
             }
         }
 
-        [HttpDelete]
+        [HttpPost]
         [Route("DeleteBook")]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> Delete(Book book)
         {
             try
             {
-                var isDeleted = await _bookReposetory.DeleteAsync(id);
+                var isDeleted = await _bookReposetory.DeleteAsync(book);
+                using StringContent idAsJson = new(book.Id.ToString(), Encoding.UTF8, "application/json");
+               var res = await _httpClient.PostAsync($"http://localhost:5158/api/LibrarySignalR/BookDeleted", idAsJson);
                 return Ok(isDeleted);
             }
             catch (Exception ex)
@@ -83,7 +92,7 @@ namespace LibraryAPI.Controllers
         [HttpPost]
         [Route("CreateBook")]
         public async Task<IActionResult> Create([FromForm] List<IFormFile> bookFiles, [FromForm] string book, [FromForm] string existingAuthorsIds, [FromForm] string newAuthors)
-        {
+         {
             try
             {
 
@@ -96,7 +105,6 @@ namespace LibraryAPI.Controllers
                 var bookObject = JsonConvert.DeserializeObject<Book>(book);
                 var existingAuthorsIdsList = JsonConvert.DeserializeObject<List<int>>(existingAuthorsIds);
                 var newAuthorsList = JsonConvert.DeserializeObject<List<Author>>(newAuthors);
-
                 var newBook = new NewBook { Book = bookObject, BookPicture = bookFiles[0], ExistingAuthorsIds = existingAuthorsIdsList, NewAuthors = newAuthorsList, BookCopy = bookFiles[1] };
                 await _bookReposetory.CreateAsync(newBook);
                 return Ok();
@@ -109,11 +117,13 @@ namespace LibraryAPI.Controllers
 
         [HttpPatch]
         [Route("Update")]
-        public async Task<IActionResult> Update(Book book)
+        public async Task<IActionResult> Update([FromForm] List<IFormFile> bookFiles, [FromForm] string book)
         {
             try
             {
-                await _bookReposetory.UpdateAsync(book);
+                var bookObject = JsonConvert.DeserializeObject<Book>(book);
+
+                await _bookReposetory.UpdateAsync(bookObject!,bookFiles);
                 return Ok();
             }
             catch (Exception ex)
@@ -122,18 +132,18 @@ namespace LibraryAPI.Controllers
             }
         }
 
-        [HttpPatch]
-        [Route("bla")]
-        public async Task<IActionResult> bla(string book)
+        [HttpPost]
+        [Route("DeletePhoto")]
+        public async Task<IActionResult> DeletPhoto(Book book)
         {
             try
             {
-                //await _bookReposetory.UpdateAsync(book);
-                return Ok();
+                await _bookReposetory.DeletePhoto(book);
+                return Ok();    
             }
-            catch (Exception ex)
+            catch(Exception ex) 
             {
-                return StatusCode(500, ex.Message);
+                return StatusCode(500, ex.Message); 
             }
         }
     }
